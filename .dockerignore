@@ -1,0 +1,13 @@
+.git
+*/.git
+.hg
+*/.hg
+.bzr
+*/.bzr
+bin
+develop-eggs
+eggs
+etc
+parts
+py27
+*/py27

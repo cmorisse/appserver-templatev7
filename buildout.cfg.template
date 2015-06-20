@@ -1,0 +1,148 @@
+[buildout]
+parts = directories_setup openerp supervisor
+versions = versions
+find-links = http://download.gna.org/pychart/
+			http://github.com/collective/collective.recipe.supervisor/tarball/master#egg=collective.recipe.supervisor-0.20.dev0
+
+[directories_setup]
+recipe = z3c.recipe.mkdir
+# This create 2 directories to sort addons
+paths = ${buildout:parts-directory}/community
+
+[openerp]
+interpreter_name = erpython
+recipe = anybox.recipe.odoo:server
+
+# Pour un download depuis nightly.openerp.com (Non utilisé car ne contient plus la 6.1.0)
+#version = nightly 7.0 latest
+#
+# !!!!! Warning: if you change version don't forget to update paths
+# in patch section 
+version = url http://nightly.odoo.com/7.0/nightly/src/openerp_7.0.20150620.tar.gz
+
+# Sélectionner les addons que vous voulez installer
+addons = 	local ./project_addons
+
+# Ajouter les addons spcéifiques au projet ici:
+#			hg ssh://hg@bitbucket.org/ambigroup/project-ag project-ag default
+
+options.admin_passwd = {{openerp_admin_password}}
+eggs = 	xlrd
+		unidecode
+		httplib2
+		python-dime
+		pyPdf
+		pillow
+
+#
+#   Configuration de la base de données 
+#   ===================================
+# 
+options.db_host = localhost
+options.db_port = 5432
+options.db_user = {{pg_user}}
+options.db_password = {{pg_password}}
+#options.unaccent = True			# ca vient ca vient ...!!!!
+
+#
+#   Configuration des log levels
+#   ============================
+#
+# On peut mettre ce qu'on veut sur les options suivantes ; elles sont ignorées 
+# si passées via fichier de config (bug dans le recipe), il faut les passer en ligne de commande
+#options.log_level = error
+#options.log_handler = :DEBUG,openerp:INFO,cmo.jsonrpc:INFO,cmo.domain:INFO,envido:DEBUG
+#options.log_handler = :ERROR 
+
+#
+#   Configuration du Logging pour Gunicorn déployé en tant que service dans /etc/init.d
+#   ===================================================================================
+#
+# Les 2 options suivantes sont nécessaires en déploiement.
+# En effet gunicorn ne permet pas de définir le fichier de log avec un paramètre ligne de commande
+# passé au script d'init.
+# Les options relatives au log doivent être définies dans ce fichier. Elle sont ensuite générées
+# dans gunicorn_openerp.conf.py par le recipe anybox.recipe.openerp
+# Les 2 lignes suivantes doivent donc être dé-commentées si le serveur est lancé en tant que
+# service.
+#options.logfile = /var/log/openerp/gunicorn-openerp.log
+#options.loglevel = 20
+
+#
+#   Configuration de gunicorn
+#   =========================
+#
+# 	Exemple:
+gunicorn = direct
+gunicorn.workers = 2
+gunicorn.timeout = 240
+gunicorn.max_requests = 2000
+gunicorn.virtual_memory_limit = 4500000000
+gunicorn.virtual_memory_reset = 4000000000
+
+[versions]
+MarkupSafe = 0.15
+Pillow = 2.4.0
+babel = 0.9.6
+feedparser = 5.1.1
+gdata = 2.0.16
+lxml = 2.3.3
+mako = 0.6.2
+psycopg2 = 2.5
+pychart = 1.39
+pydot = 1.0.28
+pyparsing = 1.5.7
+python-dateutil = 1.5
+python-ldap = 2.4.9
+python-openid = 2.2.5
+pytz = 2012b
+pywebdav = 0.9.4.1
+pyyaml = 3.10
+reportlab = 2.5
+simplejson = 2.4.0
+vatnumber = 1.0
+vobject = 0.8.1c
+werkzeug = 0.8.3
+zsi = 2.0-rc3
+zc.buildout = 2.2.3
+zc.recipe.egg = 2.0.1
+xlrd = 0.8.0
+unidecode = 0.04.12
+httplib2 = 0.8
+python-dime = 0.2.1
+pyPdf = 1.13
+anybox.recipe.odoo = 1.9.1
+collective.recipe.supervisor = 0.20.dev0
+
+[supervisor]
+recipe = collective.recipe.supervisor
+#
+# We only want to generate the programs section so that we can symlink generated file
+# to /etc/supervisor/conf.d/
+sections = services
+
+#
+# Following options are ignored due to sections settings above
+#http-socket = unix
+#file = ${buildout:directory}/var/supervisord.sock
+# port = 127.0.0.1:9001
+#supervisord-conf = ${buildout:directory}/etc/supervisord.conf
+#logfile = ${buildout:directory}/var/log/supervisord.log
+#pidfile = ${buildout:directory}/var/supervisord.pid
+#loglevel = info
+
+#
+# We want all logs in appserver directory
+logfile_openerp = ${buildout:directory}/var/log/odoo-stdout.log
+
+# User owner of preocesses (supervisor default is to run as root which is impossible for odoo)
+process_owner_user = ${openerp:options.db_user}
+
+# number of workers for multi process programs
+openerp_workers = 2
+
+# Note: Last one is for
+programs =
+    10 v7_odoo_mono (autostart=false) "${buildout:directory}/bin/start_openerp" [ --logfile "${:logfile_openerp}" --workers=0 ] ${buildout:directory} true ${:process_owner_user}
+    10 v7_odoo_multi "${buildout:directory}/bin/start_openerp" [ --logfile "${:logfile_openerp}" --workers=${:openerp_workers}] ${buildout:directory} true ${:process_owner_user}
+   
